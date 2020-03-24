@@ -66,8 +66,6 @@ arr.newPush(4)
 
 ![](~@/reactive/2.png)
 
-
-
 经过整理，`Array`原型中可以改变数组自身内容的方法有7个，分别是：`push`,`pop`,`shift`,`unshift`,`splice`,`sort`,`reverse`。那么源码中的拦截器代码如下：
 
 ```javascript
