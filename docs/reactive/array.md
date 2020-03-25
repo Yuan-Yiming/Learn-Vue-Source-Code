@@ -10,6 +10,42 @@ title: Array的变化侦测
 
 这是因为对于`Object`数据我们使用的是`JS`提供的对象原型上的方法`Object.defineProperty`，而这个方法是对象原型上的，所以`Array`无法使用这个方法，所以我们需要对`Array`型数据设计一套另外的变化侦测机制。
 
+在这里，有的同学就有疑问了，我用`Object.defineProperty`同样可以监测到`Array`型数据的变化呀，例如如下代码:
+
+```javascript
+let obj = { arr: [1, 2, 3] }
+Object.defineProperty(obj.arr, '0', {
+  set: function (newValue) {
+    console.log('数据被修改了')
+    value = newValue
+  },
+  get: function () {
+    console.log('数据被读取了')
+  } 
+})
+
+obj.arr[0]        // 数据被读取了
+obj.arr[0] = 5    // 数据被修改了
+```
+
+为什么还要对`Array`型数据设计一套另外的变化侦测机制呢？
+
+这个问题问的好。对，这个例子没有错，`Array`本质上也是`Object`，我们甚至可以把一个`Array`看作是如下样子的`Object`(这样显然是不准确的，但是便于我们理解)：
+
+```javascript
+let arr = [1,2,3]
+// =>
+let arrObj = {
+    "0":1,
+    "1":2,
+    "2":3
+}
+```
+
+可以看到，如果把`arr`看成`arrObj`，那么我们就可以使用`Object.defineProperty`来监测`arr`的变化。另外我们还知道，`Object.defineProperty`监测`Object`型数据时是给`Object`型数据的每个`key/value`添加上了`getter`和`setter`，这样，对于`Object`型数据我们在通过`key`值取值或设置值时就可以被监测到。
+
+同理，我们仔细观察，数组`arr`的索引值恰好就是`arrObj`的`key`值，所以我们通过数组的索引值来操作数组时是可以用`Object.defineProperty`监测到的。**但是，数组并不是只能由索引值来操作数组，更常用的操作数组的方法是使用数组原型上的一些方法如`push`,`shift`等来操作数组，当使用这些数组原型方法来操作数组时，`Object.defineProperty`就监测不到了，所以`Vue`对`Array`型数据单独设计了数据监测方式。**
+
 万变不离其宗，虽然对`Array`型数据设计了新的变化侦测机制，但是其根本思路还是不变的。那就是：还是在获取数据时收集依赖，数据变化时通知依赖更新。
 
 下面我们就通过源码来看看`Vue`对`Array`型数据到底是如何进行变化侦测的。
