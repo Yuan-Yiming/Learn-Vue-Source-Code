@@ -888,8 +888,6 @@ if (!isReserved(key)) {
 observe(data, true /* asRootData */)
 ```
 
-
-
 ## 6. 初始化computed
 
 计算属性`computed`相信大家一定不会陌生，在日常开发中肯定会经常用到，而且我们知道计算属性有一个很大的特点就是： 计算属性的结果会被缓存，除非依赖的响应式属性变化才会重新计算。 那么接下来我们就来看一下计算属性是如何实现这些功能的的。
@@ -973,7 +971,7 @@ function initComputed (vm: Component, computed: Object) {
 const watchers = vm._computedWatchers = Object.create(null)
 ```
 
-接着，遍历`computed`选项中的每一项属性，首先获取到每一项的属性值，记作`userDef`，然后判断`userDef`是不是一个函数，如果是函数，则该函数默认为取值器`getter`，将其赋值给变量`getter`；如果不是函数，则说明是一个对象，则取对象中的`get`属性作为取值器赋给变量`getter`。如下：
+接着，遍历用户写的`computed`选项中的每一项属性，首先获取到每一项的属性值，记作`userDef`，然后判断`userDef`是不是一个函数，如果是函数，则将该函数默认为取值器`getter`，将其赋值给变量`getter`；如果不是函数，则说明是一个对象，则取对象中的`get`属性作为取值器赋给变量`getter`。如下：
 
 ```javascript
 const userDef = computed[key]
@@ -991,7 +989,7 @@ if (process.env.NODE_ENV !== 'production' && getter == null) {
 }
 ```
 
-接着判断如果不是在服务端渲染环境下，则创建一个`watcher`实例，并将当前循环到的的属性名作为键，创建的`watcher`实例作为值存入`watchers`对象中。如下：
+接着判断如果不是在服务端渲染环境下，则为 `computed` 选项中的每一项属性创建一个 `watcher` 实例，并将当前循环到的的属性名作为键，创建的`watcher` 实例作为值，存入 `watchers` 对象中。如下：
 
 ```javascript
 if (!isSSR) {
@@ -1005,15 +1003,21 @@ if (!isSSR) {
 }
 ```
 
-最后，判断当前循环到的的属性名是否存在于当前实例`vm`上，如果存在，则在非生产环境下抛出警告；如果不存在，则调用`defineComputed`函数为实例`vm`上设置计算属性。
+其中，上面代码中创建 `watcher` 实例时所传入的 `getter` 就是取到用户所写的该计算属性的取值器。而 `computedWatcherOptions` 参数如下：
 
-以上就是`initComputed`函数的内部逻辑，接下里我们再来看一下`defineComputed`函数是如何为实例`vm`上设置计算属性的。
+```javascript
+const computedWatcherOptions = { lazy: true }
+```
+
+这个参数是用来标记当前所创建的 `watcher` 实例是一个计算属性的 `watcher` 实例，给它一个 `{ lazy: true }` 的配置，这是为将来计算属性值缓存做准备。众所周知，计算属性有个特点就是它可以缓存当前的计算结果，也就是说如果某个计算属性所依赖的数据没有发生变化，那么该计算属性就不会去重复计算，会直接获取上一次的计算结果。这个 `{ lazy: true }` 就是给计算属性做缓存时用的。
+
+最后，判断当前循环到的的属性名是否存在于当前实例 `vm` 上，如果存在，则在非生产环境下抛出警告；如果不存在，则调用 `defineComputed` 函数为实例 `vm` 上设置计算属性。
+
+以上就是 `initComputed` 函数的内部逻辑，接下来我们再来看一下 `defineComputed` 函数是如何为实例 `vm` 上设置计算属性的。
 
 ### 6.3 defineComputed函数分析
 
-
-
-`defineComputed`函数的定义位于源码的`src/core/instance/state.js`中，如下：
+`defineComputed` 函数的定义位于源码的 `src/core/instance/state.js` 中，如下：
 
 ```javascript
 const sharedPropertyDefinition = {
@@ -1055,41 +1059,55 @@ export function defineComputed (target,key,userDef) {
 
 ```
 
-该函数接受3个参数，分别是：`target`、`key`和`userDef`。其作用是为`target`上定义一个属性`key`，并且属性`key`的`getter`和`setter`根据`userDef`的值来设置。下面我们就来看一下该函数的具体逻辑。
+该函数接受3个参数，分别是：`target` 、 `key` 和 `userDef` 。其作用是为 `target` 上定义一个属性 `key` ，并且属性 `key` 的 `getter` 和 `setter` 根据 `userDef` 的值来设置。下面我们就来看一下该函数的具体逻辑。
 
-首先定义了变量`sharedPropertyDefinition`，它是一个默认的属性描述符。
+首先定义了变量 `sharedPropertyDefinition` ，它是一个默认的属性描述符，如下：
 
-接着，在函数内部定义了变量`shouldCache`，用于标识计算属性是否应该有缓存。该变量的值是当前环境是否为非服务端渲染环境，如果是非服务端渲染环境则该变量为`true`。也就是说，只有在非服务端渲染环境下计算属性才应该有缓存。如下：
+```javascript
+const sharedPropertyDefinition = {
+  enumerable: true,
+  configurable: true,
+  get: noop,
+  set: noop
+}
+```
+
+接着，在函数内部定义了变量 `shouldCache` ，用于标识计算属性是否应该有缓存。该变量的值是当前环境是否为非服务端渲染环境，如果是非服务端渲染环境则该变量为 `true` 。也就是说，只有在非服务端渲染环境下计算属性才应该有缓存。如下：
 
 ```javascript
 const shouldCache = !isServerRendering()
 ```
 
-接着，判断如果`userDef`是一个函数，则该函数默认为取值器`getter`，此处在非服务端渲染环境下并没有直接使用`userDef`作为`getter`，而是调用`createComputedGetter`函数（关于该函数下面会介绍）创建了一个`getter`，这是因为`userDef`只是一个普通的`getter`，它并没有缓存功能，所以我们需要额外创建一个具有缓存功能的`getter`，而在服务端渲染环境下可以直接使用`userDef`作为`getter`，因为在服务端渲染环境下计算属性不需要缓存。由于用户没有设置`setter`函数，所以将`sharedPropertyDefinition.set`设置为`noop`。如下：
+接着，判断如果 `userDef` 是一个函数，则该函数默认为取值器 `getter` ，此处在非服务端渲染环境下并没有直接使用 `userDef` 作为 `getter` ，而是调用 `createComputedGetter` 函数（关于该函数下面会介绍）创建了一个 `getter` ，这是因为 `userDef` 只是一个普通的 `getter` ，它并没有缓存功能，所以我们需要额外创建一个具有缓存功能的 `getter` 。由于用户没有设置 `setter` 函数，所以将 `sharedPropertyDefinition.set` 设置为 `noop` 。如下：
 
 ```javascript
+/*创建计算属性的getter*/
 if (typeof userDef === 'function') {
-    sharedPropertyDefinition.get = shouldCache
-        ? createComputedGetter(key)
-    : userDef
-    sharedPropertyDefinition.set = noop
+  sharedPropertyDefinition.get = shouldCache
+    ? createComputedGetter(key)
+    : createGetterInvoker(userDef)
+  /*
+    当userDef是一个function的时候是不需要setter的，所以这边给它设置成了空函数。
+    因为计算属性默认是一个function，只设置getter。
+    当需要设置setter的时候，会将计算属性设置成一个对象。
+  */
+  sharedPropertyDefinition.set = noop
 }
 ```
 
-如果`userDef`不是一个函数，那么就将它当作对象处理。在设置`sharedPropertyDefinition.get`的时候先判断`userDef.get`是否存在，如果不存在，则将其设置为`noop`，如果存在，则同上面一样，在非服务端渲染环境下并且用户没有明确的将`userDef.cache`设置为`false`时调用`createComputedGetter`函数创建一个`getter`赋给`sharedPropertyDefinition.get`。然后设置`sharedPropertyDefinition.set`为`userDef.set`函数。如下：
+如果 `userDef` 不是一个函数，那么就将它当作对象处理。在设置 `sharedPropertyDefinition.get` 的时候先判断 `userDef.get` 是否存在，如果不存在，则将其设置为 `noop` ，如果存在，则同上面一样，在非服务端渲染环境下并且用户没有明确的将 `userDef.cache` 设置为 `false` 时调用 `createComputedGetter` 函数创建一个 `getter` 赋给 `sharedPropertyDefinition.get` 。然后设置 `sharedPropertyDefinition.set` 为 `userDef.set` 函数。如下：
 
 ```javascript
 sharedPropertyDefinition.get = userDef.get
-      ? shouldCache && userDef.cache !== false
-        ? createComputedGetter(key)
-        : userDef.get
-      : noop
-sharedPropertyDefinition.set = userDef.set
-    ? userDef.set
-	: noop
+  ? shouldCache && userDef.cache !== false
+    ? createComputedGetter(key)
+    : createGetterInvoker(userDef.get)
+  : noop
+/*如果有设置set方法则直接使用，否则赋值空函数*/
+sharedPropertyDefinition.set = userDef.set || noop
 ```
 
-接着，再判断在非生产环境下如果用户没有设置`setter`的话，那么就给`setter`一个默认函数，这是为了防止用户在没有设置`setter`的情况下修改计算属性，从而为其抛出警告，如下：
+接着，再判断在非生产环境下如果用户没有设置 `setter` 的话，那么就给 `setter` 一个默认函数，这是为了防止用户在没有设置 `setter` 的情况下修改计算属性，从而为其抛出警告，如下：
 
 ```javascript
 if (process.env.NODE_ENV !== 'production' &&
@@ -1103,9 +1121,9 @@ if (process.env.NODE_ENV !== 'production' &&
 }
 ```
 
-最后调用`Object.defineProperty`方法将属性`key`绑定到`target`上，其中的属性描述符就是上面设置的`sharedPropertyDefinition`。如此以来，就将计算属性绑定到实例`vm`上了。
+最后调用 `Object.defineProperty` 方法将属性 `key` 绑定到 `target` 上，其中的属性描述符就是上面设置的 `sharedPropertyDefinition` 。如此以来，就将计算属性绑定到实例 `vm` 上了。
 
-以上就是`defineComputed`函数的所有逻辑。另外，我们发现，计算属性有没有缓存及其响应式貌似主要在于是否将`getter`设置为`createComputedGetter`函数的返回结果。那么接下来，我们就对这个`createComputedGetter`函数一探究竟。
+以上就是 `defineComputed` 函数的所有逻辑。另外，我们发现，计算属性有没有缓存及其响应式貌似主要在于是否将 `getter` 设置为 `createComputedGetter` 函数的返回结果。那么接下来，我们就对这个 `createComputedGetter` 函数一探究竟。
 
 ### 6.4 createComputedGetter函数分析
 
@@ -1113,127 +1131,149 @@ if (process.env.NODE_ENV !== 'production' &&
 
 ```javascript
 function createComputedGetter (key) {
-    return function computedGetter () {
-        const watcher = this._computedWatchers && this._computedWatchers[key]
-        if (watcher) {
-            watcher.depend()
-            return watcher.evaluate()
-        }
+  return function computedGetter () {
+    const watcher = this._computedWatchers && this._computedWatchers[key]
+    if (watcher) {
+      /*实际是脏检查，在计算属性中的依赖发生改变的时候dirty会变成true，
+      在get的时候重新计算计算属性的输出值*/
+      if (watcher.dirty) {
+        watcher.evaluate()
+      }
+      /*依赖收集*/
+      if (Dep.target) {
+        watcher.depend()
+      }
+      return watcher.value
     }
+  }
 }
 ```
 
-可以看到，该函数是一个高阶函数，其内部返回了一个`computedGetter`函数，所以其实是将`computedGetter`函数赋给了`sharedPropertyDefinition.get`。当获取计算属性的值时会执行属性的`getter`，而属性的`getter`就是 `sharedPropertyDefinition.get`，也就是说最终执行的 `computedGetter`函数。
+可以看到，该函数是一个高阶函数，其内部返回了一个叫做 `computedGetter` 的函数，所以其实是将 `computedGetter` 函数赋给了 `sharedPropertyDefinition.get` 。当获取计算属性的值时会执行属性的 `getter` ，而属性的 `getter` 就是 `sharedPropertyDefinition.get` ，也就是说最终执行的 `computedGetter` 函数。
 
-在`computedGetter`函数内部，首先存储在当前实例上`_computedWatchers`属性中`key`所对应的`watcher`实例，如果`watcher`存在，则调用`watcher`实例上的`depend`方法和`evaluate`方法，并且将`evaluate`方法的返回值作为计算属性的计算结果返回。那么`watcher`实例上的`depend`方法和`evaluate`方法又是什么呢？
+在 `computedGetter` 函数内部，首先获取之前创建好的存储在实例上 `_computedWatchers` 属性中当前计算属性名 `key` 所对应的 `watcher` 实例，如下：
+
+```javascript
+const watcher = this._computedWatchers && this._computedWatchers[key]
+```
+
+如果 `watcher` 实例存在，则判断该实例上的 `dirty` 属性是否为 `true` ，如果为 `true` ，即表明当前计算属性的计算结果发生了变化，则立即调用实例上的 `evaluate` 方法获取最新的计算结果，在 `evaluate` 方法内部会将最新的计算结果赋值给实例上的 `value` 属性（在下面会介绍），如下：
+
+```javascript
+if (watcher.dirty) {
+  watcher.evaluate()
+}
+```
+
+如果当前有需要收集的依赖，则调用实例上的 `depend` 方法进行依赖收集，如下：
+
+```javascript
+if (Dep.target) {
+  watcher.depend()
+}
+```
+
+最后，返回实例上的 `value` 属性，该属性即为当前计算属性的最终计算结果。
+那么 `watcher` 实例上的 `depend` 方法和 `evaluate` 方法又是什么呢？
 
 ### 6.5 depend和evaluate
 
-回顾上文中创建`watcher`实例的时候：
-
-```javascript
-const computedWatcherOptions = { computed: true }
-watchers[key] = new Watcher(
-    vm,
-    getter || noop,
-    noop,
-    computedWatcherOptions
-)
-```
-
-传入的参数中第二个参数是`getter`函数，第四个参数是一个对象`computedWatcherOptions`。
-
-我们再回顾`Watcher`类的定义，如下：
+我们再回顾 `Watcher` 类的定义，如下：
 
 ```javascript
 export default class Watcher {
-    constructor (vm,expOrFn,cb,options,isRenderWatcher) {
-        if (options) {
-            // ...
-            this.computed = !!options.computed
-            // ...
-        } else {
-            // ...
-        }
-
-        this.dirty = this.computed // for computed watchers
-        if (typeof expOrFn === 'function') {
-            this.getter = expOrFn
-        }
-
-        if (this.computed) {
-            this.value = undefined
-            this.dep = new Dep()
-        }
+  constructor (vm,expOrFn,cb,options,isRenderWatcher) {
+    if (options) {
+      // ...
+      this.lazy = !!options.lazy
+      // ...
+    } else {
+      // ...
     }
 
-    evaluate () {
-        if (this.dirty) {
-            this.value = this.get()
-            this.dirty = false
-        }
-        return this.value
+    this.dirty = this.lazy 
+    /*把表达式expOrFn解析成getter*/
+    if (typeof expOrFn === 'function') {
+      this.getter = expOrFn
+    } else {
+      this.getter = parsePath(expOrFn)
+      if (!this.getter) {
+        this.getter = noop
+      }
     }
 
-    /**
-     * Depend on this watcher. Only for computed property watchers.
-     */
-    depend () {
-        if (this.dep && Dep.target) {
-            this.dep.depend()
-        }
-    }
+    this.value = this.lazy
+      ? undefined
+      : this.get()
+  }
 
-    update () {
-        if (this.computed) {
-            if (this.dep.subs.length === 0) {
-                this.dirty = true
-            } else {
-                this.getAndInvoke(() => {
-                    this.dep.notify()
-                })
-            }
-        }
-    }
+  evaluate () {
+    this.value = this.get()
+    this.dirty = false
+  }
 
-    getAndInvoke (cb: Function) {
-        const value = this.get()
-        if (
-            value !== this.value ||
-            // Deep watchers and watchers on Object/Arrays should fire even
-            // when the value is the same, because the value may
-            // have mutated.
-            isObject(value) ||
-            this.deep
-        ) {
-            // set new value
-            const oldValue = this.value
-            this.value = value
-            this.dirty = false
-            if (this.user) {
-                try {
-                    cb.call(this.vm, value, oldValue)
-                } catch (e) {
-                    handleError(e, this.vm, `callback for watcher "${this.expression}"`)
-                }
-            } else {
-                cb.call(this.vm, value, oldValue)
-            }
-        }
+  /**
+    * Depend on this watcher. Only for computed property watchers.
+    */
+  depend () {
+    if (this.dep && Dep.target) {
+      this.dep.depend()
     }
+  }
+
+  // 当依赖发生改变的时候触发回调。
+  update () {
+    /* istanbul ignore else */
+    if (this.lazy) {
+      this.dirty = true
+    } else if (this.sync) {
+      /*同步则执行run直接渲染视图*/
+      this.run()
+    } else {
+      /*异步推送到观察者队列中，下一个tick时调用。*/
+      queueWatcher(this)
+    }
+  }
 }
 ```
 
-可以看到，在实例化`Watcher`类的时候，第四个参数传入了一个对象`computedWatcherOptions = { computed: true }`，该对象中的`computed`属性标志着这个`watcher`实例是计算属性的`watcher`实例，即`Watcher`类中的`this.computed`属性，同时类中还定义了`this.dirty`属性用于标志计算属性的返回值是否有变化，计算属性的缓存就是通过这个属性来判断的，每当计算属性依赖的数据发生变化时，会将`this.dirty`属性设置为`true`，这样下一次读取计算属性时，会重新计算结果返回，否则直接返回之前的计算结果。
+可以看到，在实例化 `Watcher` 类的时候，第四个参数传入了一个对象 `computedWatcherOptions = { lazy: true }` ，该对象中的 `lazy` 属性标志着这个 `watcher` 实例是计算属性的 `watcher` 实例，同时类中还定义了 `this.dirty` 属性用于标志计算属性的返回值是否有变化，计算属性的缓存就是通过这个属性来判断的，每当计算属性依赖的数据发生变化时，会将 `this.dirty` 属性设置为 `true` ，这样下一次读取计算属性时，会重新计算结果返回，否则直接返回之前的计算结果。
 
-当调用`watcher.depend()`方法时，会将读取计算属性的那个`watcher`添加到计算属性的`watcher`实例的依赖列表中，当计算属性中用到的数据发生变化时，计算属性的`watcher`实例就会执行`watcher.update()`方法，在`update`方法中会判断当前的`watcher`是不是计算属性的`watcher`，如果是则调用`getAndInvoke`去对比计算属性的返回值是否发生了变化，如果真的发生变化，则执行回调，通知那些读取计算属性的`watcher`重新执行渲染逻辑。
+我们可以这样想，当我们在组件中定义了一个计算属性 `name` 并且在视图中使用了该属性时，视图第一次刷新会去获取 `name` 的属性值，此时就会调用该属性值的 `getter` 方法，这个 `getter` 方法就是 `computedGetter` ，如下：
 
-当调用`watcher.evaluate()`方法时，会先判断`this.dirty`是否为`true`，如果为`true`，则表明计算属性所依赖的数据发生了变化，则调用`this.get()`重新获取计算结果最后返回；如果为`false`，则直接返回之前的计算结果。
+```javascript
+function computedGetter () {
+  const watcher = this._computedWatchers && this._computedWatchers[key]
+  if (watcher) {
+    if (watcher.dirty) {
+      watcher.evaluate()
+    }
+    if (Dep.target) {
+      watcher.depend()
+    }
+    return watcher.value
+  }
+}
+```
+
+第一次 `watcher.dirty` 值默认为 `true` ，此时就会去调用 `watcher.evaluate` 方法，在该方法中会调用 `watcher.get` 方法获取当前计算属性值并将其赋值给 `watcher.value` 属性，同时将 `watcher.dirty` 改为 `false` ，如下：
+
+```javascript
+evaluate () {
+  this.value = this.get()
+  this.dirty = false
+}
+```
+
+接着，当计算属性中用到的数据发生变化时，计算属性的 `watcher` 实例就会执行 `watcher.update` 方法，在 `update` 方法中会判断 `this.lazy` 是否为 `true`，如果为 `true` 则表明这个 `watcher` 实例是计算属性的 `watcher` 实例，那么就将 `watcher.dirty` 变为 `true` ，这样当视图再次获取 `{{name}}` 时，就会重新调用 `watcher.evaluate` 方法来获取最新的计算属性值。
+
+**如果计算属性中用到的数据没有发生变化，那么计算属性的 `watcher` 实例的 `watcher.update` 方法就不会执行，那么 `watcher.dirty` 就不会被变为 `true` ，依然为 `false` ，那么当视图再次获取 `name` 时，就不会调用 `watcher.evaluate` 方法，直接返回已有的 `watcher.value` ，即上一次的计算结果。**
+
+这就是计算属性为什么会有缓存数据的原因。
 
 其内部原理如图所示：
 
 ![](~@/lifecycle/2.png)
-
 
 ## 7. 初始化watch
 
