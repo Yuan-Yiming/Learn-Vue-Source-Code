@@ -1265,11 +1265,11 @@ evaluate () {
 }
 ```
 
-接着，当计算属性中用到的数据发生变化时，计算属性的 `watcher` 实例就会执行 `watcher.update` 方法，在 `update` 方法中会判断 `this.lazy` 是否为 `true`，如果为 `true` 则表明这个 `watcher` 实例是计算属性的 `watcher` 实例，那么就将 `watcher.dirty` 变为 `true` ，这样当视图再次获取 `{{name}}` 时，就会重新调用 `watcher.evaluate` 方法来获取最新的计算属性值。
+接着，当计算属性中用到的数据发生变化时，计算属性的 `watcher` 实例就会执行 `watcher.update` 方法，在 `update` 方法中会判断 `this.lazy` 是否为 `true`，如果为 `true` 则表明这个 `watcher` 实例是计算属性的 `watcher` 实例，那么就将 `watcher.dirty` 变为 `true` ，这样当视图再次获取 `name` 时，就会重新调用 `watcher.evaluate` 方法来获取最新的计算属性值。
 
 **如果计算属性中用到的数据没有发生变化，那么计算属性的 `watcher` 实例的 `watcher.update` 方法就不会执行，那么 `watcher.dirty` 就不会被变为 `true` ，依然为 `false` ，那么当视图再次获取 `name` 时，就不会调用 `watcher.evaluate` 方法，直接返回已有的 `watcher.value` ，即上一次的计算结果。**
 
-这就是计算属性为什么会有缓存数据的原因。
+这就是计算属性为什么会有缓存计算结果的原因。
 
 其内部原理如图所示：
 
